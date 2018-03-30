@@ -21,16 +21,17 @@ class SimpleGD:
 
 
 class SimpleSGDRegressor():
-    def __init__(self, session, dimensions, learning_rate):
+    def __init__(self, session, dimensions, learning_rate, scope_id='0'):
         self.session = session
         self.learning_rate = learning_rate
-        self.w = tf.get_variable('w', shape=(1, dimensions), initializer=tf.zeros_initializer(), dtype=tf.float32)
-        self.b = tf.get_variable('b', shape=(), initializer=tf.zeros_initializer(), dtype=tf.float32)
-        y = tf.get_variable('y', shape=(), initializer=tf.zeros_initializer(), dtype=tf.float32)
+        with tf.variable_scope('SimpleSGDRegressor' + scope_id, reuse=tf.AUTO_REUSE):
+            self.w = tf.get_variable('w', shape=(1, dimensions), initializer=tf.zeros_initializer(), dtype=tf.float32)
+            self.b = tf.get_variable('b', shape=(1,), initializer=tf.zeros_initializer(), dtype=tf.float32)
+            y = tf.get_variable('y', shape=(1,), initializer=tf.zeros_initializer(), dtype=tf.float32)
+            parameter = tf.placeholder(shape=(1, dimensions), dtype=tf.float32)
         init = tf.global_variables_initializer()
         self.session.run(init)
         model_parameters = [self.w, self.b]
-        parameter = tf.placeholder(shape=(1, dimensions), dtype=tf.float32)
         loss = (y - tf.matmul(self.w, tf.transpose(parameter)) - self.b) ** 2
         self.gradient_descent = SimpleGD(self.session, loss, model_parameters, parameter, y, self.learning_rate)
 
@@ -38,8 +39,9 @@ class SimpleSGDRegressor():
         self.gradient_descent.partial_fit(x, y)
 
     def fit(self, X, Y):
-        for x, y in zip(X, Y):
-            self.partial_fit(x.reshape((1, -1)), y)
+        for _ in range(self.max_iter):
+            for x, y in zip(X, Y):
+                self.partial_fit(x.reshape((1, -1)), y)
 
     def predict(self, x):
         return self.session.run(tf.matmul(self.w, tf.transpose(x)) + self.b).ravel()
@@ -52,21 +54,18 @@ class SGDModel:
         self.models = []
         self.feature_transformer = feature_transformer
         for i in range(environment.action_space.n):
-            #model = SGDRegressor(learning_rate='constant', max_iter=1000, tol=learning_rate)
-            model = SimpleSGDRegressor(self.session, len(environment.action_space.sample()), learning_rate)
+            model = SimpleSGDRegressor(self.session, feature_transformer.dimensions, learning_rate, scope_id=str(i))
             model.partial_fit(feature_transformer.transform([environment.reset()]), [0])
             self.models.append(model)
 
     def predict(self, state):
         transformed_state = self.feature_transformer.transform([state])
-        result = numpy.stack([m.predict(transformed_state) for m in self.models]).T
-        assert (len(result.shape) == 2)
+        result = numpy.stack([m.predict(transformed_state.astype(numpy.float32)) for m in self.models]).T
         return result
 
     def update(self, state, action, state_action_value):
         transformed_state = self.feature_transformer.transform([state])
-        assert (len(transformed_state.shape) == 2)
-        self.models[action].partial_fit(transformed_state, [state_action_value])
+        self.models[action].partial_fit(transformed_state.astype(numpy.float32), [state_action_value])
 
     def sample_action(self, state, epsilon):
         if numpy.random.random() < epsilon:
