@@ -23,17 +23,16 @@ class SimpleGD:
 class SimpleSGDRegressor():
     def __init__(self, session, dimensions, learning_rate, scope_id='0'):
         self.session = session
-        self.learning_rate = learning_rate
         with tf.variable_scope('SimpleSGDRegressor' + scope_id, reuse=tf.AUTO_REUSE):
             self.w = tf.get_variable('w', shape=(1, dimensions), initializer=tf.zeros_initializer(), dtype=tf.float32)
             self.b = tf.get_variable('b', shape=(1,), initializer=tf.zeros_initializer(), dtype=tf.float32)
-            x = tf.placeholder(shape=(1, dimensions), dtype=tf.float32)
-            y = tf.placeholder('y', shape=(1,), initializer=tf.zeros_initializer(), dtype=tf.float32)
+            x = tf.placeholder(dtype=tf.float32, shape=(1, dimensions), name='x')
+            y = tf.placeholder(dtype=tf.float32, shape=(1,), name='y')
             variables = {'w': self.w, 'b': self.b, 'x': x, 'y': y}
         init = tf.global_variables_initializer()
         self.session.run(init)
         loss = (y - tf.matmul(self.w, tf.transpose(x)) - self.b) ** 2
-        self.gradient_descent = SimpleGD(self.session, loss, variables, self.learning_rate)
+        self.gradient_descent = SimpleGD(self.session, loss, variables, learning_rate)
 
     def partial_fit(self, x, y):
         self.gradient_descent.partial_fit(x, y)
