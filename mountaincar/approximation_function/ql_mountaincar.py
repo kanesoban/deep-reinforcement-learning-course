@@ -3,7 +3,7 @@ import numpy
 from tqdm import tqdm as progress_bar
 
 from feature_transformers import MountainCarRBFFeatureTransformer
-from models import SGDModel
+from models.numpy import SGDModel
 from visualization import plot_cost_to_go
 from visualization import plot_running_avg
 
