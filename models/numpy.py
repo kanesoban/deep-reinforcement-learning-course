@@ -65,11 +65,35 @@ class SGDStateModel:
 
 
 class ActorCriticModel:
-    def __init__(self, environment, feature_transformer):
-        pass
+    def __init__(self, feature_transformer, learning_rate=0.01):
+        self.feature_transformer = feature_transformer
+        self.learning_rate = learning_rate
+        self.w = numpy.zeros(shape=(1, feature_transformer.dimensions))
+        self.actions = [0, 1]
 
-    def update(self, state, action, target):
-        pass
+    def get_action_distributions(self, action_probabilities):
+        distributions = numpy.zeros(shape=(action_probabilities.shape[0] + 1,))
+        for i in range(1, action_probabilities.shape[0]):
+            distributions[i] = distributions[i-1] + action_probabilities[i-1]
+        return distributions
+
+    def exponential_preferences(self, state):
+        transformed = numpy.hstack([self.feature_transformer.transform(state, action) for action in self.actions])
+        state_action_preferences = numpy.dot(self.w, transformed)
+        return numpy.exp(state_action_preferences), transformed
+
+    def policy_ln_gradient(self, state):
+        exp, transformed = self.exponential_preferences(state)
+        dexp_dw = exp * transformed
+        sum_exp = numpy.sum(exp)
+        return (transformed * sum_exp - numpy.sum(dexp_dw)) / sum_exp
+
+    def update(self, state, target, state_value):
+        self.w += self.learning_rate * (target - state_value) * self.policy_ln_gradient(state)
 
     def sample_action(self, state):
-        pass
+        exp, _ = self.exponential_preferences(state)
+        action_probabilities = exp / numpy.sum(exp)
+        action_distributions = self.get_action_distributions(action_probabilities)
+        r = numpy.random.uniform()
+        return self.actions[numpy.where(action_distributions < r)[0][-1]]

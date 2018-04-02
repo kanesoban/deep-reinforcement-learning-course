@@ -1,4 +1,4 @@
-import numpy.random
+import random
 import numpy
 
 
@@ -9,5 +9,5 @@ class CompoundSampler:
 
     def sample(self):
         state_sample = self.state_sampler.sample()
-        action_sample = numpy.random.sample(self.actions)
-        return numpy.hstack(state_sample, action_sample)
+        action_sample = numpy.array(random.sample([0, 1], 1))
+        return numpy.hstack((state_sample, action_sample))

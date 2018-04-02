@@ -11,7 +11,7 @@ from visualization import plot_cost_to_go
 from visualization import plot_running_avg
 
 
-def play_one_episode(environment, epsilon, gamma=0.99, max_steps=10000):
+def play_one_episode(environment, gamma=0.99, max_steps=10000):
     observation = environment.reset()
     done = False
     time_step = 0
@@ -21,11 +21,11 @@ def play_one_episode(environment, epsilon, gamma=0.99, max_steps=10000):
     state_feature_transformer = MountainCarRBFFeatureTransformer(state_sampler)
     compound_feature_transformer = MountainCarCompoundRBFFeatureTransformer(compound_sampler)
     state_value_model = SGDStateModel(environment, state_feature_transformer)
-    policy_model = ActorCriticModel(environment, compound_feature_transformer)
+    policy_model = ActorCriticModel(compound_feature_transformer)
     while not done and time_step < max_steps:
         time_step += 1
         # Choose action via softmax
-        action = policy_model.sample_action(observation, epsilon)
+        action = policy_model.sample_action(observation)
         # Take action, observe
         next_observation, reward, done, info = environment.step(action)
         # Adjust reward if episode ended
@@ -33,8 +33,9 @@ def play_one_episode(environment, epsilon, gamma=0.99, max_steps=10000):
         if done:
             reward = 100
         # Update
-        state_value = reward + gamma * state_value_model.predict(next_observation)
-        policy_model.update(observation, action, state_value)
+        target = reward + gamma * state_value_model.predict(next_observation)
+        state_value = state_value_model.predict(observation)
+        policy_model.update(observation, action, target, state_value)
         if done:
             break
         observation = next_observation
@@ -44,8 +45,7 @@ def play_one_episode(environment, epsilon, gamma=0.99, max_steps=10000):
 def play_multiple_episodes(environment, episodes):
     total_rewards = numpy.empty(episodes)
     for i in progress_bar(range(episodes), desc='Playing episode'):
-        epsilon = 1.0 / numpy.sqrt(1 + i)
-        total_rewards[i] = play_one_episode(environment, epsilon)
+        total_rewards[i] = play_one_episode(environment)
     plot_running_avg(total_rewards)
     plot_cost_to_go(environment.observation_space)
 
