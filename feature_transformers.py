@@ -36,3 +36,12 @@ class MountainCarRBFFeatureTransformer(RBFFeatureTransformer):
     def __init__(self, environment):
         gammas = [5.0, 2.0, 1.0, 0.5]
         super(MountainCarRBFFeatureTransformer, self).__init__(environment, gammas)
+
+
+class MountainCarCompoundRBFFeatureTransformer:
+    def __init__(self, environment):
+        self.state_feature_transformer = MountainCarRBFFeatureTransformer(environment)
+
+    def transform(self, observations, actions):
+        transformed_state = self.state_feature_transformer(observations)
+        return numpy.hstack(transformed_state, actions)

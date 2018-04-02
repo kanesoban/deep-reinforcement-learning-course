@@ -24,9 +24,8 @@ class SimpleSGDRegressor():
         return (numpy.dot(self.w, x.T) + self.b).ravel()
 
 
-class SGDModel:
+class SGDStateActionModel:
     def __init__(self, environment, feature_transformer, learning_rate=0.01):
-        self.env = environment
         self.models = []
         self.feature_transformer = feature_transformer
         for i in range(environment.action_space.n):
@@ -48,3 +47,29 @@ class SGDModel:
             return self.env.action_space.sample()
         else:
             return numpy.argmax(self.predict(state))
+
+
+class SGDStateModel:
+    def __init__(self, environment, feature_transformer, learning_rate=0.01):
+        self.regressor = SimpleSGDRegressor(feature_transformer.dimensions, learning_rate)
+        self.regressor.partial_fit(feature_transformer.transform([environment.reset()]), [0])
+        self.feature_transformer = feature_transformer
+
+    def predict(self, state):
+        transformed_state = self.feature_transformer.transform([state])
+        return self.regressor.predict(transformed_state.astype(numpy.float32))
+
+    def update(self, state, state_value):
+        transformed_state = self.feature_transformer.transform([state])
+        self.regressor.partial_fit(transformed_state.astype(numpy.float32), [state_value])
+
+
+class ActorCriticModel:
+    def __init__(self, environment, feature_transformer):
+        pass
+
+    def update(self, state, action, target):
+        pass
+
+    def sample_action(self, state):
+        pass

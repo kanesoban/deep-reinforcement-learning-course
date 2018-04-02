@@ -2,8 +2,11 @@ import gym
 import numpy
 from tqdm import tqdm as progress_bar
 
+from feature_transformers import MountainCarCompoundRBFFeatureTransformer
 from feature_transformers import MountainCarRBFFeatureTransformer
-from models.numpy import SGDStateActionModel
+from models.numpy import ActorCriticModel
+from models.numpy import SGDStateModel
+from samplers import CompoundSampler
 from visualization import plot_cost_to_go
 from visualization import plot_running_avg
 
@@ -13,13 +16,16 @@ def play_one_episode(environment, epsilon, gamma=0.99, max_steps=10000):
     done = False
     time_step = 0
     total_reward = 0
-    sampler = environment.observation_space
-    feature_transformer = MountainCarRBFFeatureTransformer(sampler)
-    model = SGDStateActionModel(environment, feature_transformer)
+    state_sampler = environment.observation_space
+    compound_sampler = CompoundSampler(environment, numpy.array([0, 1]))
+    state_feature_transformer = MountainCarRBFFeatureTransformer(state_sampler)
+    compound_feature_transformer = MountainCarCompoundRBFFeatureTransformer(compound_sampler)
+    state_value_model = SGDStateModel(environment, state_feature_transformer)
+    policy_model = ActorCriticModel(environment, compound_feature_transformer)
     while not done and time_step < max_steps:
         time_step += 1
-        # Choose E-greedy action
-        action = model.sample_action(observation, epsilon)
+        # Choose action via softmax
+        action = policy_model.sample_action(observation, epsilon)
         # Take action, observe
         next_observation, reward, done, info = environment.step(action)
         # Adjust reward if episode ended
@@ -27,9 +33,8 @@ def play_one_episode(environment, epsilon, gamma=0.99, max_steps=10000):
         if done:
             reward = 100
         # Update
-        next_action_predictions = model.predict(next_observation)
-        state_action_value = reward + gamma * numpy.max(next_action_predictions[0])
-        model.update(observation, action, state_action_value)
+        state_value = reward + gamma * state_value_model.predict(next_observation)
+        policy_model.update(observation, action, state_value)
         if done:
             break
         observation = next_observation
