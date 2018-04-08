@@ -1,3 +1,5 @@
+import random
+
 import gym
 import numpy
 from tqdm import tqdm as progress_bar
@@ -8,28 +10,68 @@ from visualization import plot_cost_to_go
 from visualization import plot_running_avg
 
 
+class Experience:
+    def __init__(self, experience_size=100):
+        self.experience_size = experience_size
+        self.buffer = []
+
+    def sample(self, sample_size=4):
+        return random.sample(self.buffer, sample_size)
+
+    def add_sample(self, state, action, reward, new_state):
+        state = numpy.array(state).reshape((1, -1)).astype(numpy.float32)
+        action = numpy.array(action).reshape((1, -1)).astype(numpy.float32)
+        reward = numpy.array([reward]).reshape((1, -1)).astype(numpy.float32)
+        new_state = numpy.array(new_state).reshape((1, -1)).astype(numpy.float32)
+        if len(self.buffer) >= self.experience_size:
+            self.buffer.pop()
+        self.buffer.insert(0, [state, action, reward, new_state])
+
+
+def convert_observation(observation):
+    return numpy.array(observation).reshape((1, -1)).astype(numpy.float32)
+
+
+def to_state_action_value(model, sample, gamma):
+    next_action_predictions = model.predict(sample[3])
+    return sample[2] + gamma * numpy.max(next_action_predictions[0])
+
+
+def update(model, experience, gamma):
+    if len(experience.buffer) >= 4:
+        samples = experience.sample(4)
+        states = numpy.array(list(map(lambda sample: sample[0], samples))).reshape((4, -1))
+        state_action_values = numpy.array(list(map(lambda sample: to_state_action_value(model, sample, gamma),
+                                                   samples))).reshape((4,))
+        state_action_values2 = numpy.empty((4, 2))
+        for i in range(2):
+            state_action_values2[:, i] = state_action_values
+        model.update(states, state_action_values2)
+
+
 def play_one_episode(session, environment, epsilon, gamma=0.99, max_steps=10000):
     observation = environment.reset()
     done = False
     time_step = 0
     total_reward = 0
+    experience = Experience()
+
     model = MountainCarNeuralNetwork(session, 2, 2, environment)
     session.run(tf.global_variables_initializer())
     while not done and time_step < max_steps:
         time_step += 1
         # Choose E-greedy action
-        action = model.sample_action(observation, epsilon)
+        action = model.sample_action(convert_observation(observation), epsilon)
         # Take action, observe
         next_observation, reward, done, info = environment.step(action)
         # Adjust reward if episode ended
         total_reward += reward
         if done:
             reward = 100
+        # Save experience
+        experience.add_sample(observation, action, reward, next_observation)
         # Update
-        next_action_predictions = model.predict(next_observation.reshape((1, -1)))
-        state_action_value = reward + gamma * numpy.max(next_action_predictions[0])
-        model.update(observation.reshape((1, -1)),
-                     numpy.array([state_action_value]).astype(dtype=numpy.float32))
+        update(model, experience, gamma)
         if done:
             break
         observation = next_observation

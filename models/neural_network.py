@@ -3,12 +3,12 @@ import numpy
 
 
 class NeuralNetwork:
-    def __init__(self, session, input, layers, learning_rate, scope='model'):
+    def __init__(self, session, input, layers, output_size, learning_rate, scope='model'):
         self.session = session
         self.input = input
         self.layers = layers
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-            self.target = tf.placeholder(tf.float32, shape=(None,), name='G')
+            self.target = tf.placeholder(tf.float32, shape=(None, output_size), name='G')
             self.loss_function = tf.reduce_mean(tf.square(self.target - self.layers[-1]))
             self.learning_rate = learning_rate
             self.predict_op = self.layers[-1]
@@ -42,10 +42,10 @@ class MountainCarNeuralNetwork(NeuralNetwork):
             layers.append(output)
             output = tf.contrib.layers.fully_connected(output, num_actions)
             layers.append(output)
-            super(MountainCarNeuralNetwork, self).__init__(session, input, layers, learning_rate)
+            super(MountainCarNeuralNetwork, self).__init__(session, input, layers, num_actions, learning_rate)
 
     def sample_action(self, state, epsilon):
         if numpy.random.random() < epsilon:
             return self.environment.action_space.sample()
         else:
-            return numpy.argmax(self.predict(state.reshape((1, -1))))
+            return numpy.argmax(self.predict(state))
