@@ -37,7 +37,7 @@ def to_state_action_value(model, sample, gamma):
     return sample[2] + gamma * numpy.max(next_action_predictions[0])
 
 
-def update(model, experience, gamma, experience_replay, n_actions=2, n_samples=4):
+def update(model, experience, gamma, experience_replay, n_actions=2, n_samples=4, target_model=None):
     if len(experience.buffer) >= n_samples and experience_replay:
         samples = experience.sample(n_samples)
     else:
@@ -53,7 +53,8 @@ def update(model, experience, gamma, experience_replay, n_actions=2, n_samples=4
         model.update(states, state_action_values2)
 
 
-def play_one_episode(session, environment, epsilon, gamma=0.99, max_steps=10000, experience_replay=True):
+def play_one_episode(session, environment, epsilon, gamma=0.99, max_steps=10000, experience_replay=True,
+                     use_dual_model=True):
     observation = environment.reset()
     done = False
     time_step = 0
@@ -63,6 +64,10 @@ def play_one_episode(session, environment, epsilon, gamma=0.99, max_steps=10000,
     n_actions = 2
     n_samples = 4
     model = MountainCarNeuralNetwork(session, n_actions, environment)
+    if use_dual_model:
+        target_model = MountainCarNeuralNetwork(session, n_actions, environment)
+    else:
+        target_model = model
     session.run(tf.global_variables_initializer())
     while not done and time_step < max_steps:
         time_step += 1
@@ -77,22 +82,26 @@ def play_one_episode(session, environment, epsilon, gamma=0.99, max_steps=10000,
         # Save experience
         experience.add_sample(observation, action, reward, next_observation)
         # Update
-        update(model, experience, gamma, experience_replay, n_actions=n_actions, n_samples=n_samples)
+        update(model, experience, gamma, experience_replay, n_actions=n_actions, n_samples=n_samples,
+               target_model=target_model)
+        # Update dual network
+        if use_dual_model and time_step % 100 == 0:
+            update(target_model, experience, gamma, experience_replay, n_actions=n_actions, n_samples=n_samples)
         if done:
             break
         observation = next_observation
     return total_reward
 
 
-def play_multiple_episodes(environment, episodes, experience_replay):
+def play_multiple_episodes(environment, episodes, experience_replay, use_dual_model):
     with tf.Session() as session:
         total_rewards = numpy.empty(episodes)
         for i in progress_bar(range(episodes), desc='Playing episode'):
             epsilon = 1.0 / numpy.sqrt(1 + i)
-            total_rewards[i] = play_one_episode(session, environment, epsilon, experience_replay)
+            total_rewards[i] = play_one_episode(session, environment, epsilon, experience_replay, use_dual_model)
         plot_running_avg(total_rewards)
         plot_cost_to_go(environment.observation_space)
 
 
 if __name__ == '__main__':
-    play_multiple_episodes(gym.make('MountainCar-v0'), 300, experience_replay=False)
+    play_multiple_episodes(gym.make('MountainCar-v0'), 300, experience_replay=False, use_dual_model=True)
