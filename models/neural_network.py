@@ -33,10 +33,10 @@ class NeuralNetwork:
 
 
 class MountainCarNeuralNetwork(NeuralNetwork):
-    def __init__(self, session, input_size, num_actions, environment, learning_rate=0.001, scope='mountaincar_network'):
+    def __init__(self, session, num_actions, environment, learning_rate=0.001, scope='mountaincar_network'):
         self.environment = environment
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-            input = tf.placeholder(tf.float32, shape=(None, input_size), name='X')
+            input = tf.placeholder(tf.float32, shape=(None, num_actions), name='X')
             layers = []
             output = tf.contrib.layers.fully_connected(input, num_actions)
             layers.append(output)
