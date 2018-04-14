@@ -6,8 +6,12 @@ from tqdm import tqdm as progress_bar
 
 import tensorflow as tf
 from models.neural_network import BreakoutNeuralNetwork
+from PIL import Image
 from visualization import plot_cost_to_go
 from visualization import plot_running_avg
+
+
+IMG_SIZE = (210, 160)
 
 
 class Experience:
@@ -56,21 +60,34 @@ def update(model, target_model, experience, gamma, experience_replay, n_actions=
 
 
 def convert_image(observation):
-    image = numpy.average(observation, axis=2)
-    image = image[55:-15, 7:-7]
+    image = observation[55:-15, 7:-7]
+    #image = Image.fromarray(image.astype(numpy.int))
+    #image = image.resize((int(IMG_SIZE[0] / 2), int(IMG_SIZE[1] / 2)))
+    image = numpy.average(numpy.array(image), axis=2)
+    image = image / 255.0
     return convert_array(image)
+
+
+def frames_to_state(frames_list):
+    return numpy.hstack(frames_list)
+
+
+def update_frame_list(frames, next_observation):
+    frames.pop()
+    frames.insert(0, next_observation)
 
 
 def play_one_episode(session, environment, epsilon, gamma=0.99, max_steps=10000, experience_replay=True,
                      use_dual_model=True):
     observation = environment.reset()
     observation = convert_image(observation)
+    frames_per_state = 4
+    frames = [observation for _ in range(frames_per_state)]
     done = False
     time_step = 0
     total_reward = 0
     experience = Experience()
-
-    dims = observation.shape[1]
+    dims = observation.shape[1] * frames_per_state
     n_actions = environment.action_space.n
     n_samples = 4
     model = BreakoutNeuralNetwork(session, dims, n_actions, environment)
@@ -82,14 +99,18 @@ def play_one_episode(session, environment, epsilon, gamma=0.99, max_steps=10000,
     while not done and time_step < max_steps:
         time_step += 1
         # Choose E-greedy action
-        action = model.sample_action(convert_array(observation), epsilon)
+        state = frames_to_state(frames)
+        action = model.sample_action(state, epsilon)
         # Take action, observe
         next_observation, reward, done, info = environment.step(action)
         next_observation = convert_image(next_observation)
+        # Update state and get new state
+        update_frame_list(frames, next_observation)
+        next_state = frames_to_state(frames)
         # Adjust reward if episode ended
         total_reward += reward
         # Save experience
-        experience.add_sample(observation, action, reward, next_observation)
+        experience.add_sample(state, action, reward, next_state)
         # Update
         update(model, target_model, experience, gamma, experience_replay, n_actions=n_actions, n_samples=n_samples)
         # Update dual network
@@ -97,7 +118,6 @@ def play_one_episode(session, environment, epsilon, gamma=0.99, max_steps=10000,
             update(target_model, target_model,  experience, gamma, experience_replay, n_actions=n_actions, n_samples=n_samples)
         if done:
             break
-        observation = next_observation
     return total_reward
 
 
