@@ -33,16 +33,35 @@ class NeuralNetwork:
 
 
 class MountainCarNeuralNetwork(NeuralNetwork):
-    def __init__(self, session, num_actions, environment, learning_rate=0.001, scope='mountaincar_network'):
+    def __init__(self, session, n_input, num_actions, environment, learning_rate=0.001, scope='mountaincar_network'):
         self.environment = environment
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-            input = tf.placeholder(tf.float32, shape=(None, num_actions), name='X')
+            input = tf.placeholder(tf.float32, shape=(None, n_input), name='X')
             layers = []
             output = tf.contrib.layers.fully_connected(input, num_actions)
             layers.append(output)
             output = tf.contrib.layers.fully_connected(output, num_actions)
             layers.append(output)
             super(MountainCarNeuralNetwork, self).__init__(session, input, layers, num_actions, learning_rate)
+
+    def sample_action(self, state, epsilon):
+        if numpy.random.random() < epsilon:
+            return self.environment.action_space.sample()
+        else:
+            return numpy.argmax(self.predict(state))
+
+
+class BreakoutNeuralNetwork(NeuralNetwork):
+    def __init__(self, session, n_input, num_actions, environment, learning_rate=0.001, scope='breakout_network'):
+        self.environment = environment
+        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
+            input = tf.placeholder(tf.float32, shape=(None, n_input), name='X')
+            layers = []
+            output = tf.contrib.layers.fully_connected(input, num_actions)
+            layers.append(output)
+            output = tf.contrib.layers.fully_connected(output, num_actions)
+            layers.append(output)
+            super(BreakoutNeuralNetwork, self).__init__(session, input, layers, num_actions, learning_rate)
 
     def sample_action(self, state, epsilon):
         if numpy.random.random() < epsilon:

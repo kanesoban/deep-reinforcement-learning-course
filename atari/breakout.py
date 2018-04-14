@@ -5,7 +5,7 @@ import numpy
 from tqdm import tqdm as progress_bar
 
 import tensorflow as tf
-from models.neural_network import MountainCarNeuralNetwork
+from models.neural_network import BreakoutNeuralNetwork
 from visualization import plot_cost_to_go
 from visualization import plot_running_avg
 
@@ -55,20 +55,27 @@ def update(model, target_model, experience, gamma, experience_replay, n_actions=
         model.update(states, state_action_values)
 
 
+def convert_image(observation):
+    image = numpy.average(observation, axis=2)
+    image = image[55:-15, 7:-7]
+    return convert_array(image)
+
+
 def play_one_episode(session, environment, epsilon, gamma=0.99, max_steps=10000, experience_replay=True,
                      use_dual_model=True):
     observation = environment.reset()
+    observation = convert_image(observation)
     done = False
     time_step = 0
     total_reward = 0
     experience = Experience()
 
-    dims = len(observation)
+    dims = observation.shape[1]
     n_actions = environment.action_space.n
     n_samples = 4
-    model = MountainCarNeuralNetwork(session, dims, n_actions, environment)
+    model = BreakoutNeuralNetwork(session, dims, n_actions, environment)
     if use_dual_model:
-        target_model = MountainCarNeuralNetwork(session, dims, n_actions, environment)
+        target_model = BreakoutNeuralNetwork(session, dims, n_actions, environment)
     else:
         target_model = model
     session.run(tf.global_variables_initializer())
@@ -78,10 +85,9 @@ def play_one_episode(session, environment, epsilon, gamma=0.99, max_steps=10000,
         action = model.sample_action(convert_array(observation), epsilon)
         # Take action, observe
         next_observation, reward, done, info = environment.step(action)
+        next_observation = convert_image(next_observation)
         # Adjust reward if episode ended
         total_reward += reward
-        if done:
-            reward = 100
         # Save experience
         experience.add_sample(observation, action, reward, next_observation)
         # Update
@@ -106,4 +112,4 @@ def play_multiple_episodes(environment, episodes, experience_replay, use_dual_mo
 
 
 if __name__ == '__main__':
-    play_multiple_episodes(gym.make('MountainCar-v0'), 300, experience_replay=False, use_dual_model=True)
+    play_multiple_episodes(gym.make('Breakout-v0'), 300, experience_replay=False, use_dual_model=True)
