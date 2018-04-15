@@ -36,13 +36,13 @@ class MountainCarNeuralNetwork(NeuralNetwork):
     def __init__(self, session, n_input, num_actions, environment, learning_rate=0.001, scope='mountaincar_network'):
         self.environment = environment
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-            input = tf.placeholder(tf.float32, shape=(None, n_input), name='X')
+            input_variable = tf.placeholder(tf.float32, shape=(None, n_input), name='X')
             layers = []
-            output = tf.contrib.layers.fully_connected(input, num_actions)
+            output = tf.contrib.layers.fully_connected(input_variable, num_actions)
             layers.append(output)
             output = tf.contrib.layers.fully_connected(output, num_actions)
             layers.append(output)
-            super(MountainCarNeuralNetwork, self).__init__(session, input, layers, num_actions, learning_rate)
+            super(MountainCarNeuralNetwork, self).__init__(session, input_variable, layers, num_actions, learning_rate)
 
     def sample_action(self, state, epsilon):
         if numpy.random.random() < epsilon:
@@ -52,16 +52,18 @@ class MountainCarNeuralNetwork(NeuralNetwork):
 
 
 class BreakoutNeuralNetwork(NeuralNetwork):
-    def __init__(self, session, n_input, num_actions, environment, learning_rate=0.001, scope='breakout_network'):
+    def __init__(self, session, input_shape, num_actions, environment, learning_rate=0.001, scope='breakout_network'):
         self.environment = environment
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-            input = tf.placeholder(tf.float32, shape=(None, n_input), name='X')
+            input_variable = tf.placeholder(tf.float32, shape=input_shape, name='X')
             layers = []
-            output = tf.contrib.layers.fully_connected(input, num_actions)
-            layers.append(output)
-            output = tf.contrib.layers.fully_connected(output, num_actions)
-            layers.append(output)
-            super(BreakoutNeuralNetwork, self).__init__(session, input, layers, num_actions, learning_rate)
+            layers.append(tf.layers.conv2d(inputs=input_variable, filters=32, kernel_size=[5, 5], padding="same",
+                                           activation=tf.nn.relu))
+            layers.append(tf.layers.max_pooling2d(inputs=layers[-1], pool_size=[2, 2], strides=2))
+            pooling_input_size = int(layers[-1].shape[1] * layers[-1].shape[2] * layers[-1].shape[3])
+            layers.append(tf.reshape(layers[-1], [-1, pooling_input_size]))
+            layers.append(tf.contrib.layers.fully_connected(layers[-1], num_actions))
+            super(BreakoutNeuralNetwork, self).__init__(session, input_variable, layers, num_actions, learning_rate)
 
     def sample_action(self, state, epsilon):
         if numpy.random.random() < epsilon:

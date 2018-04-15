@@ -65,7 +65,7 @@ def convert_image(observation):
     #image = image.resize((int(IMG_SIZE[0] / 2), int(IMG_SIZE[1] / 2)))
     image = numpy.average(numpy.array(image), axis=2)
     image = image / 255.0
-    return convert_array(image)
+    return image.reshape((1, image.shape[0], image.shape[1], 1)).astype(numpy.float32)
 
 
 def frames_to_state(frames_list):
@@ -81,13 +81,13 @@ def play_one_episode(session, environment, epsilon, gamma=0.99, max_steps=10000,
                      use_dual_model=True):
     observation = environment.reset()
     observation = convert_image(observation)
-    frames_per_state = 4
+    dims = (None, observation.shape[1], observation.shape[2], 1)
+    frames_per_state = 1
     frames = [observation for _ in range(frames_per_state)]
     done = False
     time_step = 0
     total_reward = 0
     experience = Experience()
-    dims = observation.shape[1] * frames_per_state
     n_actions = environment.action_space.n
     n_samples = 4
     model = BreakoutNeuralNetwork(session, dims, n_actions, environment)
